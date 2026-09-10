@@ -1220,10 +1220,23 @@ const SUGGESTED_MODEL_CATALOG = {
   "deepseek": {
     // DeepSeek's own API, reached through AI Gateway's `deepseek` upstream. Prompt and completion
     // share one 1M-token envelope; the 384K output ceiling is reserved out of it, as with
-    // Workers AI.
-    "deepseek-v4-flash": {
-      name: "DeepSeek V4 Flash", contextWindow: 1000000, outputLimit: 384000,
+    // Workers AI. Every id below carries the same envelope, so compaction budgets are unaffected
+    // by which one a chat is pinned to.
+    //
+    // `deepseek-flash` is the current generation (V4.1 Flash, launched 2026-09-10) and leads the
+    // list so it supplies the custom-model placeholder in AddModelModal. The two `v4` ids below
+    // are kept only because a stored chat or preferred-model selection resolves by id through
+    // AiGatewayConfig.resolveModel: dropping an id strands whoever picked it.
+    "deepseek-flash": {
+      name: "DeepSeek V4.1 Flash", contextWindow: 1000000, outputLimit: 384000,
     },
+    // Retired upstream; the name is still accepted and routes to V4.1 Flash at Flash pricing.
+    "deepseek-v4-flash": {
+      name: "DeepSeek V4 Flash (now V4.1 Flash)", contextWindow: 1000000, outputLimit: 384000,
+    },
+    // From 2026-09-14 12:00 Beijing time this also routes to V4.1 Flash, billed at Flash pricing,
+    // until DeepSeek ships V4.1 Pro -- at which point it becomes a real distinct model again and
+    // this entry should be revisited (name, and whether V4.1 Pro deserves its own id).
     "deepseek-v4-pro": {
       name: "DeepSeek V4 Pro", contextWindow: 1000000, outputLimit: 384000,
     },
