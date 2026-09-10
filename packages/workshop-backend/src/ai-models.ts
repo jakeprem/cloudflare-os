@@ -134,6 +134,7 @@ function catalogModel(provider: AiModelConfig["provider"], modelId: string): Mod
     case "google": return (GOOGLE_MODELS as Record<string, Model<Api>>)[modelId];
     case "cloudflare": return (CLOUDFLARE_WORKERS_AI_MODELS as Record<string, Model<Api>>)[modelId];
     case "ollama": return undefined;
+    case "deepseek": return undefined;
     default: return undefined;
   }
 }
@@ -161,6 +162,21 @@ function workersAiCompat(catalog: Model<Api> | undefined): OpenAICompletionsComp
     supportsLongCacheRetention: false,
     ...(catalog?.compat as OpenAICompletionsCompat | undefined),
     sendSessionAffinityHeaders: true,
+  };
+}
+
+// DeepSeek's chat API is OpenAI-completions shaped but predates the newer OpenAI conventions, so
+// the flags have to be set explicitly. pi does carry DeepSeek compat defaults, but it selects them
+// by baseUrl -- and through a Gateway the baseUrl is gateway.ai.cloudflare.com, so that detection
+// never fires. Same reason the ollama branch hardcodes its own.
+function deepseekCompat(): OpenAICompletionsCompat {
+  return {
+    // `store` and long cache retention are OpenAI-platform features, absent here. The system
+    // prompt must go in a "system" message: DeepSeek ignores the "developer" role rather than
+    // rejecting it, which fails silently (see the ollama branch for the same trap).
+    supportsStore: false,
+    supportsDeveloperRole: false,
+    supportsLongCacheRetention: false,
   };
 }
 
@@ -242,6 +258,25 @@ function gatewayNativeModel(config: AiModelConfig, gatewayUrl: string): Model<Ap
         cost: catalog?.cost ?? ZERO_COST,
         ...window,
         compat: workersAiCompat(catalog),
+      };
+    case "deepseek":
+      // DeepSeek's native API is OpenAI chat-completions (not the Responses API), served at the
+      // gateway's `deepseek` upstream -- so this speaks the provider's own API with no /compat
+      // translation, same as every other branch here. The DeepSeek key is the Gateway's stored
+      // provider key; no credential travels in the model config. pi has no DeepSeek catalog, so
+      // cost is synthesized as zero and real spend is read back from the Gateway log
+      // (see getAiGatewayLogCost), which is where BYOK charges land anyway.
+      return {
+        id: config.model,
+        name: catalog?.name ?? config.model,
+        api: "openai-completions",
+        provider: "deepseek",
+        baseUrl: `${gatewayUrl}/deepseek`,
+        reasoning: catalog?.reasoning ?? true,
+        input: catalog?.input ?? ["text"],
+        cost: catalog?.cost ?? ZERO_COST,
+        ...window,
+        compat: deepseekCompat(),
       };
     default:
       return undefined;
@@ -635,6 +670,26 @@ function getModelDirect(config: AiModelConfig, sessionAffinity?: string): ModelH
           ...window,
           thinkingLevelMap: catalog?.thinkingLevelMap,
           compat: catalog?.compat,
+        },
+        apiKey: config.apiToken,
+        sessionAffinity,
+      });
+    case "deepseek":
+      // No Gateway configured: talk to DeepSeek directly with the key from the model config.
+      // `apiUrl` still overrides, so this also covers pointing at a self-hosted or proxied
+      // DeepSeek-compatible endpoint.
+      return makeHandle({
+        model: {
+          id: config.model,
+          name: catalog?.name ?? config.model,
+          api: "openai-completions",
+          provider: "deepseek",
+          baseUrl: config.apiUrl ?? "https://api.deepseek.com/v1",
+          reasoning: catalog?.reasoning ?? true,
+          input: catalog?.input ?? ["text"],
+          cost: catalog?.cost ?? ZERO_COST,
+          ...window,
+          compat: deepseekCompat(),
         },
         apiKey: config.apiToken,
         sessionAffinity,

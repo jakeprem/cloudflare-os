@@ -1137,7 +1137,8 @@ export type CloudflareAccountOption = {
 };
 
 /** Supported AI providers. */
-export type AiModelProvider = "openai" | "anthropic" | "google" | "cloudflare" | "ollama";
+export type AiModelProvider =
+    "openai" | "anthropic" | "google" | "cloudflare" | "ollama" | "deepseek";
 
 /** Information about the AI gateway configuration. Returned by `AuthenticatedApi.getAiConfig()`. */
 export type AiGatewayInfo = {
@@ -1215,6 +1216,17 @@ const SUGGESTED_MODEL_CATALOG = {
   },
   "google": {
     "gemini-3.6-flash": {name: "Gemini 3.6 Flash", contextWindow: 1048576},
+  },
+  "deepseek": {
+    // DeepSeek's own API, reached through AI Gateway's `deepseek` upstream. Prompt and completion
+    // share one 1M-token envelope; the 384K output ceiling is reserved out of it, as with
+    // Workers AI.
+    "deepseek-v4-flash": {
+      name: "DeepSeek V4 Flash", contextWindow: 1000000, outputLimit: 384000,
+    },
+    "deepseek-v4-pro": {
+      name: "DeepSeek V4 Pro", contextWindow: 1000000, outputLimit: 384000,
+    },
   },
   "ollama": {
   },
